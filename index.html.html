@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopping List</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#8B5CF6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Shopping List">
+    <meta name="description" content="Twoja osobista lista zakupów">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180x180.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/apple-touch-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="icons/apple-touch-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="icons/apple-touch-icon-76x76.png">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16x16.png">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React and ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Lucide React Icons -->
+    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        /* PWA optimizations */
+        body {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior: none;
+        }
+        
+        /* Prevent zoom on input focus */
+        input[type="text"], input[type="number"] {
+            font-size: 16px;
+        }
+        
+        /* Safe area for iPhone */
+        .safe-area-top {
+            padding-top: env(safe-area-inset-top);
+        }
+        
+        .safe-area-bottom {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+        const { Plus, Trash2, ShoppingCart, List, Check, Calendar } = lucideReact;
+
+        const ShoppingListApp = () => {
+            // Load data from localStorage on app start
+            const [items, setItems] = useState(() => {
+                try {
+                    const savedItems = localStorage.getItem('shopping-list-items');
+                    return savedItems ? JSON.parse(savedItems) : [];
+                } catch (error) {
+                    return [];
+                }
+            });
+            
+            const [newItem, setNewItem] = useState({ name: '', price: '' });
+            const [showAddForm, setShowAddForm] = useState(false);
+            const [activeTab, setActiveTab] = useState('current');
+            
+            const [savedLists, setSavedLists] = useState(() => {
+                try {
+                    const savedHistoryLists = localStorage.getItem('shopping-list-history');
+                    return savedHistoryLists ? JSON.parse(savedHistoryLists) : [];
+                } catch (error) {
+                    return [];
+                }
+            });
+
+            // Save to localStorage whenever items change
+            React.useEffect(() => {
+                localStorage.setItem('shopping-list-items', JSON.stringify(items));
+            }, [items]);
+
+            // Save to localStorage whenever saved lists change
+            React.useEffect(() => {
+                localStorage.setItem('shopping-list-history', JSON.stringify(savedLists));
+            }, [savedLists]);
+
+            const addItem = () => {
+                if (newItem.name.trim()) {
+                    const item = {
+                        id: Date.now(),
+                        name: newItem.name.trim(),
+                        price: parseFloat(newItem.price) || 0,
+                        purchased: false
+                    };
+                    setItems([...items, item]);
+                    setNewItem({ name: '', price: '' });
+                    setShowAddForm(false);
+                }
+            };
+
+            const removeItem = (id) => {
+                setItems(items.filter(item => item.id !== id));
+            };
+
+            const togglePurchased = (id) => {
+                setItems(items.map(item => 
+                    item.id === id ? { ...item, purchased: !item.purchased } : item
+                ));
+            };
+
+            const finishList = () => {
+                if (items.length === 0) return;
+                
+                const finishedList = {
+                    id: Date.now(),
+                    date: new Date().toLocaleDateString('pl-PL'),
+                    items: [...items],
+                    totalCost: totalCost,
+                    purchasedCost: purchasedCost,
+                    itemsCount: items.length,
+                    purchasedCount: items.filter(item => item.purchased).length
+                };
+                
+                setSavedLists([finishedList, ...savedLists]);
+                setItems([]);
+                setShowAddForm(false);
+            };
+
+            const deleteSavedList = (listId) => {
+                setSavedLists(savedLists.filter(list => list.id !== listId));
+            };
+
+            const totalCost = items.reduce((sum, item) => sum + item.price, 0);
+            const purchasedCost = items.filter(item => item.purchased).reduce((sum, item) => sum + item.price, 0);
+
+            return (
+                <div className="max-w-md mx-auto bg-white min-h-screen safe-area-top safe-area-bottom">
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-b-3xl shadow-lg">
+                        <div className="flex items-center justify-center mb-4">
+                            <ShoppingCart className="w-8 h-8 mr-3" />
+                            <h1 className="text-2xl font-bold">Shopping List</h1>
+                        </div>
+                        
+                        {/* Tabs */}
+                        <div className="flex bg-white/20 backdrop-blur-sm rounded-2xl p-1 mb-4">
+                            <button
+                                onClick={() => setActiveTab('current')}
+                                className={`flex-1 py-2 px-4 rounded-xl font-semibold transition-all ${
+                                    activeTab === 'current'
+                                        ? 'bg-white text-purple-600 shadow-md'
+                                        : 'text-white/80 hover:text-white'
+                                }`}
+                            >
+                                Aktualna Lista
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('history')}
+                                className={`flex-1 py-2 px-4 rounded-xl font-semibold transition-all ${
+                                    activeTab === 'history'
+                                        ? 'bg-white text-purple-600 shadow-md'
+                                        : 'text-white/80 hover:text-white'
+                                }`}
+                            >
+                                Moje Listy
+                            </button>
+                        </div>
+                        
+                        {/* Summary - only show for current tab */}
+                        {activeTab === 'current' && (
+                            <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-sm opacity-90">Łączny koszt:</span>
+                                    <span className="text-xl font-bold">{totalCost.toFixed(2)} zł</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm opacity-90">Kupione:</span>
+                                    <span className="text-lg font-semibold text-yellow-300">{purchasedCost.toFixed(2)} zł</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Add Item Form - only show for current tab */}
+                    {showAddForm && activeTab === 'current' && (
+                        <div className="p-6 bg-yellow-50 border-b-2 border-yellow-200">
+                            <h3 className="text-lg font-semibold text-purple-700 mb-4">Dodaj nowy produkt</h3>
+                            <div className="space-y-4">
+                                <input
+                                    type="text"
+                                    placeholder="Nazwa produktu"
+                                    value={newItem.name}
+                                    onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                                    className="w-full p-3 border-2 border-purple-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                                />
+                                <input
+                                    type="number"
+                                    placeholder="Cena (zł)"
+                                    value={newItem.price}
+                                    onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
+                                    className="w-full p-3 border-2 border-purple-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                                    step="0.01"
+                                />
+                                <div className="flex space-x-3">
+                                    <button
+                                        onClick={addItem}
+                                        className="flex-1 bg-purple-500 text-white py-3 rounded-xl font-semibold hover:bg-purple-600 transition-colors"
+                                    >
+                                        Dodaj
+                                    </button>
+                                    <button
+                                        onClick={() => setShowAddForm(false)}
+                                        className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-400 transition-colors"
+                                    >
+                                        Anuluj
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Content */}
+                    <div className="p-6">
+                        {activeTab === 'current' ? (
+                            // Current Shopping List
+                            <>
+                                {items.length === 0 ? (
+                                    <div className="text-center py-12">
+                                        <ShoppingCart className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                                        <p className="text-gray-500 text-lg">Twoja lista jest pusta</p>
+                                        <p className="text-gray-400">Dodaj pierwszy produkt!</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="space-y-3 mb-6">
+                                            {items.map((item) => (
+                                                <div
+                                                    key={item.id}
+                                                    className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                                                        item.purchased
+                                                            ? 'bg-green-50 border-green-200 opacity-75'
+                                                            : 'bg-white border-purple-200 hover:border-purple-300 shadow-sm'
+                                                    }`}
+                                                    onClick={() => togglePurchased(item.id)}
+                                                >
+                                                    <div className="flex items-center flex-1">
+                                                        <div
+                                                            className={`w-6 h-6 rounded-full border-2 mr-4 flex items-center justify-center ${
+                                                                item.purchased
+                                                                    ? 'bg-green-500 border-green-500'
+                                                                    : 'border-purple-300 hover:border-purple-500'
+                                                            }`}
+                                                        >
+                                                            {item.purchased && (
+                                                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                                </svg>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <h4 className={`font-semibold ${item.purchased ? 'line-through text-gray-500' : 'text-gray-800'}`}>
+                                                                {item.name}
+                                                            </h4>
+                                                            <p className={`text-lg font-bold ${item.purchased ? 'text-gray-400' : 'text-purple-600'}`}>
+                                                                {item.price.toFixed(2)} zł
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            removeItem(item.id);
+                                                        }}
+                                                        className="ml-4 p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                    >
+                                                        <Trash2 className="w-5 h-5" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        
+                                        {/* Finish List Button */}
+                                        <button
+                                            onClick={finishList}
+                                            className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-xl font-bold text-lg hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg flex items-center justify-center"
+                                        >
+                                            <Check className="w-6 h-6 mr-3" />
+                                            Zakończ listę zakupów
+                                        </button>
+                                    </>
+                                )}
+                            </>
+                        ) : (
+                            // Saved Lists History
+                            <>
+                                {savedLists.length === 0 ? (
+                                    <div className="text-center py-12">
+                                        <List className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                                        <p className="text-gray-500 text-lg">Brak zapisanych list</p>
+                                        <p className="text-gray-400">Ukończ pierwszą listę zakupów!</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {savedLists.map((list) => (
+                                            <div key={list.id} className="bg-white border-2 border-purple-200 rounded-xl p-5 shadow-sm relative">
+                                                {/* Delete Button */}
+                                                <button
+                                                    onClick={() => deleteSavedList(list.id)}
+                                                    className="absolute top-4 right-4 p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Usuń listę"
+                                                >
+                                                    <Trash2 className="w-5 h-5" />
+                                                </button>
+                                                
+                                                <div className="flex items-center justify-between mb-3 pr-12">
+                                                    <div className="flex items-center">
+                                                        <Calendar className="w-5 h-5 text-purple-500 mr-2" />
+                                                        <span className="font-semibold text-purple-700">{list.date}</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-2xl font-bold text-purple-600">{list.totalCost.toFixed(2)} zł</p>
+                                                        <p className="text-sm text-gray-500">Kupiono: {list.purchasedCost.toFixed(2)} zł</p>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <span className="text-gray-600">Produkty: {list.itemsCount}</span>
+                                                    <span className="text-green-600 font-semibold">Kupione: {list.purchasedCount}/{list.itemsCount}</span>
+                                                </div>
+                                                
+                                                <div className="border-t pt-3">
+                                                    <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
+                                                        {list.items.map((item, index) => (
+                                                            <div key={index} className="flex justify-between items-center text-sm">
+                                                                <span className={`${item.purchased ? 'line-through text-gray-500' : 'text-gray-700'}`}>
+                                                                    {item.name}
+                                                                </span>
+                                                                <span className={`font-semibold ${item.purchased ? 'text-gray-400' : 'text-purple-600'}`}>
+                                                                    {item.price.toFixed(2)} zł
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+
+                    {/* Add Button - only show for current tab */}
+                    {activeTab === 'current' && (
+                        <div className="fixed bottom-6 right-6">
+                            <button
+                                onClick={() => setShowAddForm(!showAddForm)}
+                                className={`w-16 h-16 rounded-full text-white shadow-lg transition-all transform hover:scale-105 ${
+                                    showAddForm
+                                        ? 'bg-gray-500 rotate-45'
+                                        : 'bg-gradient-to-r from-yellow-400 to-yellow-500'
+                                }`}
+                            >
+                                <Plus className="w-8 h-8 mx-auto" />
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        ReactDOM.render(<ShoppingListApp />, document.getElementById('root'));
+    </script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('sw.js')
+                    .then(function(registration) {
+                        console.log('SW registered with scope: ', registration.scope);
+                    })
+                    .catch(function(error) {
+                        console.log('SW registration failed: ', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
